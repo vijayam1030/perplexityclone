@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import uvicorn
@@ -34,10 +36,26 @@ orchestrator = SearchOrchestrator(
     ollama_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 )
 
+# Get absolute path to project root (one level up from backend)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Serve static files
+@app.get("/")
+async def read_root():
+    return FileResponse(os.path.join(BASE_DIR, "index.html"))
+
+@app.get("/styles.css")
+async def read_styles():
+    return FileResponse(os.path.join(BASE_DIR, "styles.css"))
+
+@app.get("/script.js")
+async def read_script():
+    return FileResponse(os.path.join(BASE_DIR, "script.js"))
+
 class SearchRequest(BaseModel):
     query: str
     use_cache: bool = True
-    provider: str = "wikipedia"
+    provider: str = "all"
 
 @app.post("/search")
 async def search(request: SearchRequest):
@@ -63,7 +81,7 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_json()
             query = data.get("query")
             use_cache = data.get("use_cache", True)
-            provider = data.get("provider", "wikipedia")
+            provider = data.get("provider", "all")
             
             if not query:
                 await websocket.send_json({"error": "Query is required"})

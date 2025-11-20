@@ -206,7 +206,7 @@ Answer:"""
         Returns:
             List of suggestion strings
         """
-        prompt = f"""Based on the search query "{query}", generate 3 short, relevant follow-up search questions.
+        prompt = f"""Based on the search query "{query}", generate 6 short, relevant follow-up search questions.
         Return ONLY the questions, one per line. Do not number them. Do not add quotes."""
         
         try:
@@ -220,7 +220,7 @@ Answer:"""
                     cleaned = re.sub(r'^[\d\.\-\*\s"\']+', '', line).strip('"\'')
                     if cleaned:
                         suggestions.append(cleaned)
-            return suggestions[:3]
+            return suggestions[:6]
         except Exception as e:
             print(f"Suggestion generation error: {e}")
             return []

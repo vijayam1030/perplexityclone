@@ -242,7 +242,7 @@ class SearchOrchestrator:
         
         return state
     
-    def search(self, query: str, use_cache: bool = True, provider: str = "wikipedia") -> Dict[str, Any]:
+    def search(self, query: str, use_cache: bool = True, provider: str = "all") -> Dict[str, Any]:
         """
         Execute the full search pipeline.
         
@@ -298,7 +298,7 @@ class SearchOrchestrator:
                 "error": str(e)
             }
     
-    def search_stream(self, query: str, use_cache: bool = True, provider: str = "wikipedia"):
+    def search_stream(self, query: str, use_cache: bool = True, provider: str = "all"):
         """
         Execute search pipeline with streaming answer generation.
         
