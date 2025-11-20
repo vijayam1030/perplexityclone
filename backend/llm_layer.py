@@ -196,3 +196,31 @@ Answer:"""
                 yield f"Error: LLM returned status {response.status_code}"
         except Exception as e:
             yield f"Error generating response: {e}"
+    def generate_suggestions(self, query: str) -> List[str]:
+        """
+        Generate follow-up search suggestions based on the query.
+        
+        Args:
+            query: User's search query
+            
+        Returns:
+            List of suggestion strings
+        """
+        prompt = f"""Based on the search query "{query}", generate 3 short, relevant follow-up search questions.
+        Return ONLY the questions, one per line. Do not number them. Do not add quotes."""
+        
+        try:
+            response = self._generate(self.small_model, prompt, temperature=0.5)
+            suggestions = []
+            import re
+            for line in response.split('\n'):
+                line = line.strip()
+                if line:
+                    # Remove leading numbers (1., 1), bullets (-, *), and quotes
+                    cleaned = re.sub(r'^[\d\.\-\*\s"\']+', '', line).strip('"\'')
+                    if cleaned:
+                        suggestions.append(cleaned)
+            return suggestions[:3]
+        except Exception as e:
+            print(f"Suggestion generation error: {e}")
+            return []

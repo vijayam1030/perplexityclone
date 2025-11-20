@@ -133,20 +133,40 @@ class SearchOrchestrator:
         search_queries = analysis.get("search_queries", [query])
         primary_query = search_queries[0] if search_queries else query
         
-        # Check search cache (only for default provider for now)
-        cached_search = self.cache.get_search_results(primary_query)
-        if cached_search and provider == "duckduckgo":
-            print("  ✓ Using cached search results")
-            state["search_results"] = cached_search
-        else:
-            result = self.search_layer.search_and_extract(primary_query, provider=provider)
-            state["search_results"] = result.get("search_results", [])
-            state["extracted_contents"] = result.get("extracted_contents", [])
+        if provider == "all":
+            all_results = []
+            all_contents = []
+            # Search all providers
+            for p in ["google", "duckduckgo", "wikipedia"]:
+                print(f"  → Searching {p}...")
+                try:
+                    # Check cache for individual provider search
+                    # Note: We are not caching 'all' searches as a single block currently
+                    result = self.search_layer.search_and_extract(primary_query, provider=p)
+                    all_results.extend(result.get("search_results", []))
+                    all_contents.extend(result.get("extracted_contents", []))
+                except Exception as e:
+                    print(f"  Error searching {p}: {e}")
             
-            # Cache search results (only for default provider)
-            if provider == "duckduckgo":
-                self.cache.set_search_results(primary_query, state["search_results"])
-            print(f"  Found {len(state['search_results'])} results")
+            state["search_results"] = all_results
+            state["extracted_contents"] = all_contents
+            print(f"  Found {len(state['search_results'])} total results from all sources")
+            
+        else:
+            # Check search cache (only for default provider for now)
+            cached_search = self.cache.get_search_results(primary_query)
+            if cached_search and provider == "duckduckgo":
+                print("  ✓ Using cached search results")
+                state["search_results"] = cached_search
+            else:
+                result = self.search_layer.search_and_extract(primary_query, provider=provider)
+                state["search_results"] = result.get("search_results", [])
+                state["extracted_contents"] = result.get("extracted_contents", [])
+                
+                # Cache search results (only for default provider)
+                if provider == "duckduckgo":
+                    self.cache.set_search_results(primary_query, state["search_results"])
+                print(f"  Found {len(state['search_results'])} results")
         
         return state
     
@@ -294,15 +314,52 @@ class SearchOrchestrator:
         if use_cache:
             cached = self.cache.get_query_result(query)
             if cached:
+                # Send cached result first
                 yield {"type": "cached", "data": cached}
+                
+                # Check if we have cached suggestions, if not generate them
+                if "suggestions" in cached and cached["suggestions"]:
+                    yield {"type": "suggestions", "data": cached["suggestions"]}
+                else:
+                    # Generate new suggestions for cached result
+                    yield {"type": "status", "message": "Generating follow-up questions..."}
+                    suggestions = self.llm.generate_suggestions(query)
+                    yield {"type": "suggestions", "data": suggestions}
+                    
+                    # Update cache with suggestions
+                    cached["suggestions"] = suggestions
+                    self.cache.set_query_result(query, cached)
+                
                 return
         
         # Run pipeline up to answer generation
         yield {"type": "status", "message": "Analyzing query..."}
         analysis = self.llm.analyze_query(query)
         
-        yield {"type": "status", "message": f"Searching with {provider}..."}
-        search_results_data = self.search_layer.search_and_extract(query, provider=provider)
+        if provider == "all":
+            all_results = []
+            all_contents = []
+            
+            # Define providers to search
+            providers = ["google", "duckduckgo", "wikipedia"]
+            
+            for p in providers:
+                yield {"type": "status", "message": f"Searching {p}..."}
+                try:
+                    search_results_data = self.search_layer.search_and_extract(query, provider=p)
+                    all_results.extend(search_results_data.get("search_results", []))
+                    all_contents.extend(search_results_data.get("extracted_contents", []))
+                except Exception as e:
+                    print(f"Error searching {p}: {e}")
+            
+            search_results_data = {
+                "search_results": all_results,
+                "extracted_contents": all_contents
+            }
+            
+        else:
+            yield {"type": "status", "message": f"Searching with {provider}..."}
+            search_results_data = self.search_layer.search_and_extract(query, provider=provider)
         
         yield {"type": "status", "message": "Processing content..."}
         extracted = search_results_data.get("extracted_contents", [])
@@ -312,6 +369,11 @@ class SearchOrchestrator:
         
         # Send sources
         yield {"type": "sources", "data": sources}
+        
+        # Generate and send suggestions EARLY
+        yield {"type": "status", "message": "Generating follow-up questions..."}
+        suggestions = self.llm.generate_suggestions(query)
+        yield {"type": "suggestions", "data": suggestions}
         
         # Stream answer generation
         yield {"type": "status", "message": "Generating answer..."}
@@ -330,4 +392,4 @@ class SearchOrchestrator:
         }
         self.cache.set_query_result(query, cache_data)
         
-        yield {"type": "complete", "data": {"answer": full_answer, "sources": sources}}
+        yield {"type": "complete", "data": {"answer": full_answer, "sources": sources, "suggestions": suggestions}}

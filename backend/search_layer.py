@@ -18,13 +18,6 @@ import nest_asyncio
 # Apply nest_asyncio
 nest_asyncio.apply()
 
-# Import mock search for fallback when rate-limited
-try:
-    from mock_search import get_mock_results
-    MOCK_AVAILABLE = True
-except ImportError:
-    MOCK_AVAILABLE = False
-
 class SearchLayer:
     def __init__(self, max_results: int = 10, max_content_length: int = 5000):
         """
@@ -197,12 +190,6 @@ class SearchLayer:
         """
         # Perform search
         search_results = self.search(query, provider)
-        
-        # Fallback to mock ONLY if using DuckDuckGo and it failed
-        if not search_results and provider == "duckduckgo":
-            if MOCK_AVAILABLE:
-                print("  → Using mock results as fallback")
-                return get_mock_results(query)
         
         if not search_results:
             return {

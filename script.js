@@ -127,9 +127,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
 
             case 'complete':
-                // Final cleanup or formatting if needed
+                loadingText.textContent = 'Done';
+                setTimeout(() => {
+                    loadingIndicator.classList.add('hidden');
+                }, 1000);
+                break;
+
+            case 'suggestions':
+                updateSuggestions(data.data);
                 break;
         }
+    }
+
+    function updateSuggestions(suggestions) {
+        const suggestionsContainer = document.querySelector('.suggestions');
+        if (!suggestionsContainer || !suggestions || suggestions.length === 0) return;
+
+        suggestionsContainer.innerHTML = '';
+        suggestions.forEach(suggestion => {
+            const chip = document.createElement('button');
+            chip.className = 'suggestion-chip';
+            chip.textContent = suggestion;
+            chip.addEventListener('click', () => {
+                const searchInput = document.getElementById('search-input');
+                searchInput.value = suggestion;
+                performSearch(suggestion);
+            });
+            suggestionsContainer.appendChild(chip);
+        });
     }
 
     function renderSources(sources) {
