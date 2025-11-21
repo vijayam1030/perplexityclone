@@ -45,8 +45,10 @@ document.addEventListener('DOMContentLoaded', () => {
             socket.close();
         }
 
-        // Connect to WebSocket
-        socket = new WebSocket('ws://localhost:8000/ws');
+        // Connect to WebSocket - use dynamic URL for Cloudflare tunnel support
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        socket = new WebSocket(wsUrl);
 
         socket.onopen = () => {
             loadingText.textContent = 'Connected. Sending query...';

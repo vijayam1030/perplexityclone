@@ -363,6 +363,7 @@ main {
     text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
 }
 
@@ -446,4 +447,56 @@ footer {
     background: transparent;
     padding: 0;
     color: #e2e8f0;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+    .app-container {
+        padding: 16px;
+        max-width: 100%;
+    }
+
+    header {
+        margin-bottom: 24px;
+        padding: 16px 0;
+    }
+
+    .logo {
+        font-size: 1.25rem;
+    }
+
+    .search-box-wrapper {
+        padding: 6px 12px;
+        flex-wrap: wrap;
+    }
+
+    #search-input {
+        font-size: 1rem;
+        min-width: 150px;
+    }
+
+    .provider-select {
+        font-size: 0.85rem;
+        padding: 6px;
+        max-width: 100px;
+    }
+
+    .sources-container {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .answer-title {
+        font-size: 1.1rem;
+    }
+
+    .suggestion-chip {
+        font-size: 0.85rem;
+        padding: 8px 12px;
+    }
+
+    .markdown-content pre {
+        padding: 12px;
+        font-size: 0.85rem;
+    }
 }

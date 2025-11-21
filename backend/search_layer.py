@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 import wikipedia
 from googlesearch import search as google_search
 import nest_asyncio
+import requests
 
 # Apply nest_asyncio
 nest_asyncio.apply()
@@ -50,6 +51,10 @@ class SearchLayer:
             return self._search_wikipedia(query)
         elif provider == "google":
             return self._search_google(query)
+        elif provider == "bing":
+            return self._search_bing(query)
+        elif provider == "brave":
+            return self._search_brave(query)
         else:
             return self._search_duckduckgo(query)
 
@@ -110,6 +115,66 @@ class SearchLayer:
             return formatted_results
         except Exception as e:
             print(f"Google search error: {e}")
+            return []
+    
+    def _search_bing(self, query: str) -> List[Dict[str, str]]:
+        """Search using Bing."""
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            url = f"https://www.bing.com/search?q={query.replace(' ', '+')}"
+            response = requests.get(url, headers=headers, timeout=10)
+            soup = BeautifulSoup(response.text, 'lxml')
+            
+            formatted_results = []
+            results = soup.select('.b_algo')[:self.max_results]
+            
+            for result in results:
+                title_elem = result.select_one('h2 a')
+                snippet_elem = result.select_one('.b_caption p')
+                
+                if title_elem:
+                    formatted_results.append({
+                        "title": title_elem.get_text(strip=True),
+                        "url": title_elem.get('href', ''),
+                        "snippet": snippet_elem.get_text(strip=True) if snippet_elem else ""
+                    })
+            
+            return formatted_results
+        except Exception as e:
+            print(f"Bing search error: {e}")
+            return []
+    
+    def _search_brave(self, query: str) -> List[Dict[str, str]]:
+        """Search using Brave Search."""
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            url = f"https://search.brave.com/search?q={query.replace(' ', '+')}"
+            response = requests.get(url, headers=headers, timeout=10)
+            soup = BeautifulSoup(response.text, 'lxml')
+            
+            formatted_results = []
+            # Brave uses different selectors - adjust as needed
+            results = soup.select('.snippet')[:self.max_results]
+            
+            for result in results:
+                title_elem = result.select_one('.snippet-title')
+                url_elem = result.select_one('.snippet-url')
+                snippet_elem = result.select_one('.snippet-description')
+                
+                if title_elem:
+                    formatted_results.append({
+                        "title": title_elem.get_text(strip=True),
+                        "url": url_elem.get('href', '') if url_elem else '',
+                        "snippet": snippet_elem.get_text(strip=True) if snippet_elem else ""
+                    })
+            
+            return formatted_results
+        except Exception as e:
+            print(f"Brave search error: {e}")
             return []
     
     async def fetch_url_content(self, session: aiohttp.ClientSession, url: str) -> Optional[str]:

@@ -7,6 +7,7 @@ from typing import TypedDict, List, Dict, Any
 from langgraph.graph import StateGraph, END
 import asyncio
 import nest_asyncio
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Apply nest_asyncio to allow nested event loops
 nest_asyncio.apply()
@@ -343,14 +344,27 @@ class SearchOrchestrator:
             # Define providers to search
             providers = ["google", "duckduckgo", "wikipedia"]
             
-            for p in providers:
-                yield {"type": "status", "message": f"Searching {p}..."}
+            yield {"type": "status", "message": "Searching all sources in parallel..."}
+            
+            # Helper function for parallel execution
+            def search_provider(p):
                 try:
-                    search_results_data = self.search_layer.search_and_extract(query, provider=p)
-                    all_results.extend(search_results_data.get("search_results", []))
-                    all_contents.extend(search_results_data.get("extracted_contents", []))
+                    return p, self.search_layer.search_and_extract(query, provider=p)
                 except Exception as e:
                     print(f"Error searching {p}: {e}")
+                    return p, {"search_results": [], "extracted_contents": []}
+            
+            # Execute searches in parallel
+            with ThreadPoolExecutor(max_workers=3) as executor:
+                # Submit all tasks
+                future_to_provider = {executor.submit(search_provider, p): p for p in providers}
+                
+                # Collect results as they complete
+                for future in as_completed(future_to_provider):
+                    provider_name, search_results_data = future.result()
+                    yield {"type": "status", "message": f"Received results from {provider_name}"}
+                    all_results.extend(search_results_data.get("search_results", []))
+                    all_contents.extend(search_results_data.get("extracted_contents", []))
             
             search_results_data = {
                 "search_results": all_results,
