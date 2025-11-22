@@ -200,7 +200,7 @@ class SearchOrchestrator:
         # Perform RAG
         extracted_contents = state.get("extracted_contents", [])
         if extracted_contents:
-            rag_results = self.rag.process_documents(extracted_contents, query, top_k=5)
+            rag_results = self.rag.process_documents(extracted_contents, query, top_k=10)
             state["rag_results"] = rag_results
             state["context"] = self.rag.format_context(rag_results)
             state["sources"] = rag_results.get("sources", [])
@@ -377,25 +377,42 @@ class SearchOrchestrator:
         
         yield {"type": "status", "message": "Processing content..."}
         extracted = search_results_data.get("extracted_contents", [])
-        rag_results = self.rag.process_documents(extracted, query, top_k=5)
+        rag_results = self.rag.process_documents(extracted, query, top_k=10)
         context = self.rag.format_context(rag_results)
         sources = rag_results.get("sources", [])
         
         # Send sources
         yield {"type": "sources", "data": sources}
         
-        # Generate and send suggestions EARLY
-        yield {"type": "status", "message": "Generating follow-up questions..."}
-        suggestions = self.llm.generate_suggestions(query)
-        yield {"type": "suggestions", "data": suggestions}
+        yield {"type": "status", "message": "Generating answer & suggestions..."}
+        
+        # Start suggestion generation in background
+        executor = ThreadPoolExecutor(max_workers=1)
+        suggestion_future = executor.submit(self.llm.generate_suggestions, query)
+        suggestions_sent = False
         
         # Stream answer generation
-        yield {"type": "status", "message": "Generating answer..."}
-        
         answer_parts = []
-        for token in self.llm.generate_answer(query, context, sources, stream=True):
-            answer_parts.append(token)
-            yield {"type": "token", "data": token}
+        try:
+            for token in self.llm.generate_answer(query, context, sources, stream=True):
+                answer_parts.append(token)
+                yield {"type": "token", "data": token}
+                
+                # Check if suggestions are ready
+                if not suggestions_sent and suggestion_future.done():
+                    suggestions = suggestion_future.result()
+                    yield {"type": "suggestions", "data": suggestions}
+                    suggestions_sent = True
+        finally:
+            # Ensure we get suggestions if they finish after answer
+            if not suggestions_sent:
+                try:
+                    suggestions = suggestion_future.result()
+                    yield {"type": "suggestions", "data": suggestions}
+                except Exception as e:
+                    print(f"Error getting suggestions: {e}")
+            
+            executor.shutdown(wait=False)
         
         # Cache result
         full_answer = "".join(answer_parts)

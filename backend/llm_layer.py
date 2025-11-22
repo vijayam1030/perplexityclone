@@ -100,8 +100,8 @@ Respond in JSON format:
         # Format sources
         sources_text = "\n".join([f"- {s.get('title', s.get('domain', s['url']))}: {s['url']}" for s in sources])
         
-        prompt = f"""You are an AI search assistant. Answer the user's question using the provided context from web sources.
-
+        prompt = f"""You are a helpful and accurate AI search assistant. Answer the user's question using the provided context from web sources.
+        
 User Question: {query}
 
 Context from web sources:
@@ -111,18 +111,18 @@ Sources:
 {sources_text}
 
 Instructions:
-1. Provide a comprehensive, accurate answer based on the context
-2. Cite sources using [1], [2], etc. when making specific claims
-3. If the context doesn't fully answer the question, say so
-4. Be concise but thorough
-5. Use clear, professional language
+1. Prioritize the provided context for specific facts and details.
+2. Be accurate with names and relationships (e.g., clarify who is a brother vs son).
+3. If the context is ambiguous, you may use general knowledge to clarify, but prioritize the context.
+4. Cite sources using [1], [2], etc.
+5. Provide a detailed and comprehensive answer.
 
 Answer:"""
         
         if stream:
-            return self._generate_stream(self.large_model, prompt)
+            return self._generate_stream(self.large_model, prompt, temperature=0.5)
         else:
-            return self._generate(self.large_model, prompt)
+            return self._generate(self.large_model, prompt, temperature=0.5)
     
     def _generate(self, model: str, prompt: str, temperature: float = 0.7) -> str:
         """
